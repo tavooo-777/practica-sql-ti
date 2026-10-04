@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Práctica SQL · TI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="marca">
+      <h1>Práctica SQL</h1>
+      <span class="sub">Certamen 1 · Tecnologías de Información</span>
+    </div>
+    <div class="top-der">
+      <div id="progreso" class="progreso" aria-live="polite"></div>
+      <div id="reloj" class="reloj" hidden></div>
+      <button id="btnCertamen" class="btn btn-sec">Modo certamen</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="lista" class="lista" aria-label="Ejercicios"></aside>
+
+    <main id="principal" class="principal">
+      <div id="cargando" class="cargando">Cargando SQLite…</div>
+
+      <section id="vistaEjercicio" hidden>
+        <div class="cabecera">
+          <div class="chips" id="chips"></div>
+          <h2 id="titulo"></h2>
+          <p id="enunciado" class="enunciado"></p>
+          <p id="notaBase" class="nota-base" hidden></p>
+        </div>
+
+        <details id="panelEsquema" class="esquema" open>
+          <summary>Esquema y datos de la base <span id="nombreBase"></span></summary>
+          <div id="esquema" class="tablas"></div>
+        </details>
+
+        <div class="editor-wrap">
+          <label for="editor" class="visually-hidden">Tu SQL</label>
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Escribe tu SQL aquí…"></textarea>
+          <div class="acciones">
+            <button id="btnEjecutar" class="btn">Ejecutar <kbd>⌘↵</kbd></button>
+            <button id="btnRevisar" class="btn btn-prim">Revisar <kbd>⌘⇧↵</kbd></button>
+            <button id="btnPista" class="btn btn-sec">Pista</button>
+            <button id="btnSolucion" class="btn btn-sec">Ver solución</button>
+            <span class="esp"></span>
+            <button id="btnSiguiente" class="btn btn-sec">Siguiente →</button>
+          </div>
+        </div>
+
+        <div id="pistas" class="pistas" hidden></div>
+        <div id="feedback" class="feedback" hidden></div>
+        <div id="resultado" class="resultado" hidden></div>
+        <div id="solucion" class="solucion" hidden></div>
+      </section>
+
+      <section id="vistaResumen" hidden></section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
+  <script src="ejercicios.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
