@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL para el test · TI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="marca"><h1>SQL para el test</h1><span class="sub">Tecnologías de Información · LAB3, LAB4 y LAB5</span></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-vista="resumen" class="tab activo">Resumen</button>
+    <button role="tab" data-vista="tests" class="tab">Tests</button>
+    <button role="tab" data-vista="practica" class="tab">Práctica de laboratorio</button>
+  </nav>
+</header>
+
+<main>
+<!-- ═════════════════ RESUMEN ═════════════════ -->
+<section id="v-resumen" class="vista">
+  <div class="layout-res">
+    <nav class="toc" aria-label="Contenido">
+      <b>Contenido</b>
+      <a href="#r-mapa">1. Mapa: DDL, DML y consultas</a>
+      <a href="#r-tipos">2. Tipos de dato</a>
+      <a href="#r-create">3. CREATE TABLE por dentro</a>
+      <a href="#r-restr">4. Restricciones</a>
+      <a href="#r-fk">5. ON DELETE y ON UPDATE</a>
+      <a href="#r-alter">6. ALTER, DROP y TRUNCATE</a>
+      <a href="#r-dml">7. INSERT, UPDATE y DELETE</a>
+      <a href="#r-select">8. SELECT y sus cláusulas</a>
+      <a href="#r-agg">9. Agregaciones y GROUP BY</a>
+      <a href="#r-join">10. JOIN</a>
+      <a href="#r-sub">11. Subconsultas</a>
+      <a href="#r-vista">12. Vistas</a>
+      <a href="#r-err">13. Errores típicos</a>
+    </nav>
+
+    <div class="contenido">
+      <p class="intro">Todo sale de los tres laboratorios (LAB3 DDL y DML, LAB4 consultas, LAB5 repaso). Cuando termines de leer, pasa a <a href="#" data-ir="tests">Tests</a> y luego a la <a href="#" data-ir="practica">Práctica</a>, donde escribes SQL de verdad.</p>
+
+      <article id="r-mapa" class="bloque">
+        <h2>1. Mapa: DDL, DML y consultas</h2>
+        <p>SQL es el lenguaje para hablar con la base de datos. PostgreSQL es el sistema que lo ejecuta. Los comandos se agrupan por lo que hacen:</p>
+        <table>
+          <tr><th>Grupo</th><th>Hace</th><th>Comandos</th></tr>
+          <tr><td><b>DDL</b> (definición)</td><td>Crea o cambia la <b>estructura</b></td><td><code>CREATE</code> <code>ALTER</code> <code>DROP</code> <code>TRUNCATE</code></td></tr>
+          <tr><td><b>DML</b> (manipulación)</td><td>Cambia los <b>datos</b> dentro de las tablas</td><td><code>INSERT</code> <code>UPDATE</code> <code>DELETE</code></td></tr>
+          <tr><td><b>Consultas</b></td><td>Lee datos, no los cambia</td><td><code>SELECT</code> (con <code>JOIN</code>, <code>WHERE</code>, <code>GROUP BY</code>, <code>ORDER BY</code>, <code>LIMIT</code>)</td></tr>
+        </table>
+        <p class="tip">Pregunta clave al leer un enunciado: ¿me piden <b>crear la tabla</b> (DDL), <b>cambiar filas</b> (DML) o <b>mirar datos</b> (SELECT)?</p>
+      </article>
+
+      <article id="r-tipos" class="bloque">
+        <h2>2. Tipos de dato</h2>
+        <table>
+          <tr><th>Tipo</th><th>Para qué</th><th>Ejemplo</th></tr>
+          <tr><td><code>VARCHAR(n)</code></td><td>Texto de hasta n caracteres (n obligatorio)</td><td>nombre, rut, email</td></tr>
+          <tr><td><code>TEXT</code></td><td>Texto sin límite</td><td>observaciones</td></tr>
+          <tr><td><code>INTEGER</code></td><td>Entero (hasta unos 2.100 millones)</td><td>edad, año, precio en pesos</td></tr>
+          <tr><td><code>BIGINT</code></td><td>Entero muy grande</td><td>montos enormes</td></tr>
+          <tr><td><code>REAL</code> / <code>DOUBLE PRECISION</code></td><td>Decimal aproximado</td><td>mediciones</td></tr>
+          <tr><td><code>NUMERIC</code></td><td>Decimal exacto, ideal para dinero</td><td>precio con centavos</td></tr>
+          <tr><td><code>SERIAL</code></td><td>Entero que se autoincrementa (1, 2, 3...)</td><td>id que genera la base</td></tr>
+          <tr><td><code>BOOLEAN</code></td><td>Verdadero o falso</td><td>activo</td></tr>
+          <tr><td><code>DATE</code></td><td>Fecha sin hora, entre comillas simples</td><td><code>'2024-03-01'</code></td></tr>
+          <tr><td><code>TIMESTAMP</code></td><td>Fecha y hora</td><td>momento de la venta</td></tr>
+        </table>
+      </article>
+
+      <article id="r-create" class="bloque">
+        <h2>3. CREATE TABLE por dentro</h2>
+        <p>Así se lee una tabla real del LAB4. Cada número se explica abajo.</p>
+        <pre class="codigo anot"><span class="k">CREATE TABLE</span> esports.torneo <span class="n">1</span>(
+    id_torneo <span class="t">INT</span> <span class="k">PRIMARY KEY</span>,                      <span class="n">2</span>
+    id_juego <span class="t">INT</span> <span class="k">NOT NULL</span>,                         <span class="n">3</span>
+    nombre_torneo <span class="t">VARCHAR(80)</span> <span class="k">NOT NULL</span>,
+    premio <span class="t">INT</span> <span class="k">NOT NULL CHECK</span> (premio &gt;= 0),       <span class="n">4</span>
+    fecha_inicio <span class="t">DATE</span> <span class="k">NOT NULL</span>,
+    modalidad <span class="t">VARCHAR(20)</span> <span class="k">NOT NULL CHECK</span>
+        (modalidad <span class="k">IN</span> ('Presencial','Online','Híbrida')), <span class="n">5</span>
+    <span class="k">FOREIGN KEY</span> (id_juego) <span class="k">REFERENCES</span> esports.videojuego(id_juego) <span class="n">6</span>
+        <span class="k">ON DELETE RESTRICT</span> <span class="k">ON UPDATE CASCADE</span>               <span class="n">7</span>
+);                                                   <span class="n">8</span></pre>
+        <ol class="leyenda">
+          <li><b>Nombre de la tabla.</b> Con esquema: <code>esquema.tabla</code>. Después del nombre se abre el paréntesis.</li>
+          <li><b>Columna = nombre + tipo + restricciones.</b> <code>PRIMARY KEY</code> identifica cada fila: no se repite ni es NULL.</li>
+          <li><b>NOT NULL:</b> el dato es obligatorio. Esta columna es además la FK (el torneo siempre es de un juego).</li>
+          <li><b>CHECK (condición):</b> rechaza valores que no la cumplen (premio negativo).</li>
+          <li><b>CHECK con IN:</b> el valor debe estar en la lista (dominio).</li>
+          <li><b>FOREIGN KEY (columna_local) REFERENCES tabla_padre(columna_padre):</b> el valor debe existir en la tabla padre.</li>
+          <li><b>Política de la FK:</b> qué hacer si el padre se borra o cambia su clave (sección 5).</li>
+          <li><b>Cierre:</b> sin coma después de la última línea, y termina con <code>;</code>.</li>
+        </ol>
+        <h3>Tabla N:M: clave primaria compuesta</h3>
+        <pre class="codigo"><span class="k">CREATE TABLE</span> esports.participa (
+    id_jugador <span class="t">INT NOT NULL</span>,
+    id_equipo  <span class="t">INT NOT NULL</span>,
+    <span class="k">PRIMARY KEY</span> (id_jugador, id_equipo),            <span class="c">-- la PK junta las dos columnas</span>
+    <span class="k">FOREIGN KEY</span> (id_jugador) <span class="k">REFERENCES</span> esports.jugador(id_jugador)
+        <span class="k">ON DELETE CASCADE ON UPDATE CASCADE</span>,
+    <span class="k">FOREIGN KEY</span> (id_equipo) <span class="k">REFERENCES</span> esports.equipo(id_equipo)
+        <span class="k">ON DELETE CASCADE ON UPDATE CASCADE</span>
+);</pre>
+        <p class="tip">Reglas de oro: <b>(1)</b> crea primero las tablas padre y después las hijas; <b>(2)</b> separa con coma cada columna y cada restricción, pero no pongas coma antes del <code>)</code> final; <b>(3)</b> cada FK necesita <code>REFERENCES</code>.</p>
+      </article>
+
+      <article id="r-restr" class="bloque">
+        <h2>4. Restricciones</h2>
+        <table>
+          <tr><th>Restricción</th><th>Qué hace</th><th>Cómo se escribe</th></tr>
+          <tr><td><code>PRIMARY KEY</code></td><td>Identifica la fila; sin duplicados ni NULL. Una por tabla</td><td><code>id INT PRIMARY KEY</code></td></tr>
+          <tr><td><code>FOREIGN KEY</code></td><td>El valor debe existir en otra tabla (integridad referencial)</td><td><code>FOREIGN KEY (a) REFERENCES t(a)</code></td></tr>
+          <tr><td><code>NOT NULL</code></td><td>Prohíbe NULL</td><td><code>nombre VARCHAR(50) NOT NULL</code></td></tr>
+          <tr><td><code>UNIQUE</code></td><td>Prohíbe repetidos (otra clave candidata)</td><td><code>email VARCHAR(50) UNIQUE</code></td></tr>
+          <tr><td><code>CHECK</code></td><td>Exige una condición lógica</td><td><code>precio NUMERIC CHECK (precio &gt; 0)</code></td></tr>
+          <tr><td><code>DEFAULT</code></td><td>Valor si no se indica al insertar</td><td><code>estado VARCHAR(20) DEFAULT 'borrador'</code></td></tr>
+        </table>
+      </article>
+
+      <article id="r-fk" class="bloque">
+        <h2>5. ON DELETE y ON UPDATE</h2>
+        <p>Definen qué pasa con las filas <b>hijas</b> cuando la fila <b>padre</b> se borra (<code>ON DELETE</code>) o cambia su clave (<code>ON UPDATE</code>).</p>
+        <table>
+          <tr><th>Acción</th><th>Efecto sobre las hijas</th><th>Ejemplo del laboratorio</th></tr>
+          <tr><td><code>CASCADE</code></td><td>El cambio se propaga: se borran, o toman la clave nueva</td><td>Borras un autor y se borran sus libros</td></tr>
+          <tr><td><code>SET NULL</code></td><td>La FK de la hija queda en NULL</td><td>Borras una categoría y sus productos quedan sin categoría</td></tr>
+          <tr><td><code>SET DEFAULT</code></td><td>La FK toma su valor DEFAULT. <b>La columna debe tener DEFAULT</b>, si no falla</td><td>Pedidos vuelven al estado 1</td></tr>
+          <tr><td><code>RESTRICT</code></td><td>Impide la operación si hay hijas</td><td>No puedes borrar un departamento con empleados</td></tr>
+        </table>
+        <div class="caso">
+          <b>Caso con el esquema esports</b>
+          <ul>
+            <li><code>DELETE FROM esports.jugador WHERE id_jugador = 3001;</code> falla: 3001 es capitán del equipo 5001 y <code>equipo.capitan</code> es <code>ON DELETE RESTRICT</code>.</li>
+            <li><code>DELETE FROM esports.equipo WHERE id_equipo = 5001;</code> funciona y arrastra sus filas de <code>participa</code> y <code>compite</code>, porque ahí es <code>CASCADE</code>.</li>
+          </ul>
+        </div>
+        <p class="tip">Dos siempre: insertar una FK con un valor que no existe en el padre se rechaza con cualquier política. Y si no escribes nada, la política por defecto es <b>NO ACTION</b>, que se comporta como RESTRICT.</p>
+      </article>
+
+      <article id="r-alter" class="bloque">
+        <h2>6. ALTER, DROP y TRUNCATE</h2>
+        <table>
+          <tr><th>Comando</th><th>Efecto</th></tr>
+          <tr><td><code>ALTER TABLE t ADD COLUMN c VARCHAR(50);</code></td><td>Agrega una columna. Las filas existentes quedan con NULL ahí</td></tr>
+          <tr><td><code>ALTER TABLE t DROP COLUMN c;</code></td><td>Quita una columna</td></tr>
+          <tr><td><code>TRUNCATE TABLE t;</code></td><td>Borra <b>todas las filas</b>; la tabla sigue existiendo, vacía</td></tr>
+          <tr><td><code>DROP TABLE t;</code></td><td>Destruye la tabla completa (estructura y datos)</td></tr>
+          <tr><td><code>DROP DATABASE d;</code></td><td>Destruye la base de datos</td></tr>
+        </table>
+      </article>
+
+      <article id="r-dml" class="bloque">
+        <h2>7. INSERT, UPDATE y DELETE</h2>
+<pre class="codigo"><span class="c">-- Insertar: primero el padre, después la hija</span>
+<span class="k">INSERT INTO</span> autos.propietario (rut, nombre, apellido, ciudad)
+<span class="k">VALUES</span> ('8738936-0', 'Diego', 'Muñoz', 'Valparaiso');
+
+<span class="c">-- Actualizar: SIEMPRE con WHERE</span>
+<span class="k">UPDATE</span> autos.vehiculo
+<span class="k">SET</span> rut = '8738936-0'
+<span class="k">WHERE</span> patente = 'HTTP25';
+
+<span class="c">-- Borrar: SIEMPRE con WHERE</span>
+<span class="k">DELETE FROM</span> autos.propietario
+<span class="k">WHERE</span> nombre = 'Abraham' <span class="k">AND</span> apellido = 'Pérez';</pre>
+        <ul>
+          <li>Texto y fechas van entre <b>comillas simples</b>; los números, sin comillas ni puntos.</li>
+          <li>Los valores van en el mismo orden que la lista de columnas.</li>
+          <li>Sin <code>WHERE</code>, <code>UPDATE</code> y <code>DELETE</code> afectan <b>todas</b> las filas.</li>
+          <li>La sintaxis es <code>UPDATE tabla SET ...</code> y <code>DELETE FROM tabla ...</code>. La diapositiva del LAB3 escribe <code>UPDATE INTO</code> y <code>DELETE tabla</code>, que están mal.</li>
+        </ul>
+      </article>
+
+      <article id="r-select" class="bloque">
+        <h2>8. SELECT y sus cláusulas</h2>
+<pre class="codigo"><span class="k">SELECT</span> [<span class="k">DISTINCT</span>] columnas | *       <span class="c">-- 5. qué columnas muestro</span>
+<span class="k">FROM</span> tabla                          <span class="c">-- 1. de dónde saco los datos</span>
+[<span class="k">JOIN</span> otra <span class="k">ON</span> condición]             <span class="c">-- 2. unir tablas</span>
+<span class="k">WHERE</span> condición                     <span class="c">-- 3. filtra filas</span>
+[<span class="k">GROUP BY</span> columna]                  <span class="c">-- 4. agrupa</span>
+[<span class="k">ORDER BY</span> columna [ASC|DESC]]       <span class="c">-- 6. ordena</span>
+[<span class="k">LIMIT</span> n];                          <span class="c">-- 7. corta a n filas</span></pre>
+        <p>Se <b>escribe</b> en ese orden, pero la base lo <b>resuelve</b> en el orden de los números: primero FROM y JOIN, luego WHERE, GROUP BY, SELECT, ORDER BY y al final LIMIT.</p>
+        <table>
+          <tr><th>Quiero...</th><th>Uso</th><th>Ejemplo</th></tr>
+          <tr><td>Filtrar</td><td><code>WHERE</code> con <code>= &lt;&gt; &gt; &gt;= &lt; &lt;=</code>, <code>AND</code>, <code>OR</code>, <code>NOT</code></td><td><code>WHERE precio &lt;= 2000</code></td></tr>
+          <tr><td>Quitar repetidos</td><td><code>DISTINCT</code></td><td><code>SELECT DISTINCT ciudad FROM cliente</code></td></tr>
+          <tr><td>Ordenar</td><td><code>ORDER BY col DESC</code> (más grande primero) o <code>ASC</code></td><td><code>ORDER BY fecha DESC</code></td></tr>
+          <tr><td>Las n primeras</td><td><code>LIMIT n</code> junto con ORDER BY</td><td><code>ORDER BY premio DESC LIMIT 5</code></td></tr>
+          <tr><td>Renombrar</td><td><code>AS</code></td><td><code>FROM producto AS p</code>, <code>COUNT(*) AS total</code></td></tr>
+        </table>
+        <p class="tip">"Los 5 con mayor X" = <code>ORDER BY X DESC LIMIT 5</code>. "Los más recientes primero" = <code>ORDER BY fecha DESC</code>.</p>
+      </article>
+
+      <article id="r-agg" class="bloque">
+        <h2>9. Agregaciones y GROUP BY</h2>
+        <p>Una función de agregación resume muchas filas en un valor:</p>
+        <table>
+          <tr><th>Función</th><th>Devuelve</th><th>Sobre la tabla de ventas (2, 4, 7)</th></tr>
+          <tr><td><code>SUM(col)</code></td><td>La suma</td><td>13</td></tr>
+          <tr><td><code>AVG(col)</code></td><td>El promedio</td><td>4,333</td></tr>
+          <tr><td><code>COUNT(*)</code></td><td>Cuántas filas hay</td><td>3</td></tr>
+          <tr><td><code>COUNT(col)</code></td><td>Cuántas filas tienen col <b>distinto de NULL</b></td><td>3</td></tr>
+          <tr><td><code>MAX(col)</code> / <code>MIN(col)</code></td><td>El mayor / el menor</td><td>7 / 2</td></tr>
+        </table>
+        <p><b>GROUP BY</b> hace el cálculo una vez por grupo:</p>
+<pre class="codigo"><span class="k">SELECT</span> c.nombre, <span class="k">COUNT(*)</span> <span class="k">AS</span> cantidad_productos
+<span class="k">FROM</span> minimarket.producto <span class="k">AS</span> p
+<span class="k">JOIN</span> minimarket.categoria <span class="k">AS</span> c <span class="k">ON</span> p.id_categoria = c.id_categoria
+<span class="k">GROUP BY</span> c.nombre;     <span class="c">-- una fila por categoría</span></pre>
+        <ul>
+          <li><b>Regla:</b> toda columna del SELECT que no sea una función de agregación debe aparecer en el GROUP BY.</li>
+          <li>"Por cada X" o "de cada X" en el enunciado anuncia un <code>GROUP BY X</code>.</li>
+          <li><code>COUNT(*)</code> cuenta filas aunque tengan NULL. <code>COUNT(sponsor)</code> se salta los NULL.</li>
+          <li>Con <code>GROUP BY</code> el resultado tiene <b>una fila por grupo</b>.</li>
+        </ul>
+      </article>
+
+      <article id="r-join" class="bloque">
+        <h2>10. JOIN</h2>
+        <p>Une filas de varias tablas cuando una condición las relaciona. Casi siempre es <b>clave primaria = clave foránea</b>.</p>
+<pre class="codigo"><span class="c">-- Estilo del curso: JOIN explícito</span>
+<span class="k">SELECT</span> v.marca
+<span class="k">FROM</span> autos.vehiculo <span class="k">AS</span> v
+<span class="k">JOIN</span> autos.propietario <span class="k">AS</span> p <span class="k">ON</span> v.rut = p.rut
+<span class="k">WHERE</span> p.nombre = 'María' <span class="k">AND</span> p.apellido = 'Peña';
+
+<span class="c">-- Equivalente antiguo (join implícito): funciona, pero el curso pide JOIN</span>
+<span class="k">SELECT</span> v.marca
+<span class="k">FROM</span> autos.vehiculo <span class="k">AS</span> v, autos.propietario <span class="k">AS</span> p
+<span class="k">WHERE</span> v.rut = p.rut <span class="k">AND</span> p.nombre = 'María' <span class="k">AND</span> p.apellido = 'Peña';</pre>
+        <h3>Receta para consultas con varias tablas</h3>
+        <ol>
+          <li><b>¿Qué columnas piden?</b> Escríbelas en el SELECT con su alias: <code>c.nombre</code>.</li>
+          <li><b>¿Qué tablas están en el camino?</b> Incluye también la tabla del medio (la N:M).</li>
+          <li><b>Une cada par vecino con ON</b>, PK = FK. Con n tablas necesitas <b>n−1 JOIN</b>.</li>
+          <li><b>El filtro va en WHERE.</b> Los ON solo sirven para unir.</li>
+        </ol>
+<pre class="codigo"><span class="c">-- Nombres de los 3 productos más vendidos (4 pasos en una consulta)</span>
+<span class="k">SELECT</span> p.nombre, <span class="k">SUM</span>(d.cantidad) <span class="k">AS</span> total_vendido
+<span class="k">FROM</span> minimarket.producto <span class="k">AS</span> p
+<span class="k">JOIN</span> minimarket.detalle_venta <span class="k">AS</span> d <span class="k">ON</span> p.sku = d.sku
+<span class="k">GROUP BY</span> p.nombre
+<span class="k">ORDER BY</span> total_vendido <span class="k">DESC</span>
+<span class="k">LIMIT</span> 3;</pre>
+        <p class="tip">Si olvidas un ON, cada fila se combina con todas las de la otra tabla y el resultado se multiplica sin sentido.</p>
+      </article>
+
+      <article id="r-sub" class="bloque">
+        <h2>11. Subconsultas</h2>
+        <p>Un SELECT dentro de otro. Sirve cuando necesitas un valor o un conjunto calculado antes.</p>
+<pre class="codigo"><span class="c">-- El producto más caro (una subconsulta que devuelve UN valor)</span>
+<span class="k">SELECT</span> nombre, precio
+<span class="k">FROM</span> minimarket.producto
+<span class="k">WHERE</span> precio = (<span class="k">SELECT MAX</span>(precio) <span class="k">FROM</span> minimarket.producto);
+
+<span class="c">-- Equipos que no compiten (una subconsulta que devuelve VARIOS valores: IN)</span>
+<span class="k">SELECT</span> nombre_equipo <span class="k">FROM</span> esports.equipo
+<span class="k">WHERE</span> id_equipo <span class="k">NOT IN</span> (<span class="k">SELECT</span> id_equipo <span class="k">FROM</span> esports.compite);
+
+<span class="c">-- Una subconsulta como tabla: lleva alias obligatorio</span>
+<span class="k">SELECT</span> <span class="k">COUNT</span>(*) <span class="k">FROM</span> (<span class="k">SELECT DISTINCT</span> ciudad <span class="k">FROM</span> minimarket.cliente) <span class="k">AS</span> ciudades;</pre>
+        <ul>
+          <li>Un valor: <code>=</code>, <code>&gt;</code>, etc. Varios valores: <code>IN</code> / <code>NOT IN</code>.</li>
+          <li>Para "el más caro", también sirve <code>ORDER BY precio DESC LIMIT 1</code>. Si hubiera empate, la subconsulta con MAX devuelve todos los empatados y LIMIT 1 solo uno.</li>
+        </ul>
+      </article>
+
+      <article id="r-vista" class="bloque">
+        <h2>12. Vistas</h2>
+<pre class="codigo"><span class="k">CREATE OR REPLACE VIEW</span> equipos_con_torneo <span class="k">AS</span>
+<span class="k">SELECT DISTINCT</span> e.nombre_equipo
+<span class="k">FROM</span> esports.equipo <span class="k">AS</span> e
+<span class="k">JOIN</span> esports.compite <span class="k">AS</span> c <span class="k">ON</span> e.id_equipo = c.id_equipo;
+
+<span class="k">SELECT</span> * <span class="k">FROM</span> equipos_con_torneo;   <span class="c">-- se usa como una tabla</span></pre>
+        <p>Una vista es una <b>consulta guardada con nombre</b>. No almacena datos: cada vez que la lees, se ejecuta el SELECT y muestra los datos actuales.</p>
+      </article>
+
+      <article id="r-err" class="bloque">
+        <h2>13. Errores típicos</h2>
+        <table>
+          <tr><th>Error</th><th>Corrección</th></tr>
+          <tr><td>Coma antes del <code>)</code> final en CREATE TABLE</td><td>Quita la última coma</td></tr>
+          <tr><td><code>FOREIGN KEY (a) tabla(a)</code> sin <code>REFERENCES</code></td><td><code>FOREIGN KEY (a) REFERENCES tabla(a)</code></td></tr>
+          <tr><td><code>UPDATE</code> o <code>DELETE</code> sin <code>WHERE</code></td><td>Siempre filtra, o cambias toda la tabla</td></tr>
+          <tr><td>Insertar la hija antes que el padre</td><td>Primero el padre</td></tr>
+          <tr><td>Olvidar el esquema: <code>FROM producto</code></td><td><code>FROM minimarket.producto</code></td></tr>
+          <tr><td>Columna con el mismo nombre en 2 tablas</td><td>Escribe <code>alias.columna</code> (ambigua si no)</td></tr>
+          <tr><td>SELECT con columna suelta y agregación sin GROUP BY</td><td>Agrega esa columna al <code>GROUP BY</code></td></tr>
+          <tr><td>Comparar con <code>= NULL</code></td><td>Se usa <code>IS NULL</code></td></tr>
+          <tr><td>Un JOIN con menos ON que n−1</td><td>Cuenta las tablas y une cada par</td></tr>
+          <tr><td>Texto sin comillas simples o con comillas dobles</td><td><code>'Valorant'</code></td></tr>
+          <tr><td>Escribir mal una palabra clave (<code>UPTADE</code>)</td><td>Revisa letra por letra: <code>UPDATE</code></td></tr>
+        </table>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════ TESTS ═════════════════ -->
+<section id="v-tests" class="vista" hidden>
+  <div class="cab-sec"><h2>Tests de alternativas</h2><p>Tres tests. Elige una opción y la corrección sale al instante, con la explicación.</p></div>
+  <div id="menuTests" class="menu-tests"></div>
+  <div id="areaTest"></div>
+</section>
+
+<!-- ═════════════════ PRÁCTICA ═════════════════ -->
+<section id="v-practica" class="vista" hidden>
+  <div class="layout-pr">
+    <aside id="listaPr" class="lista" aria-label="Ejercicios"></aside>
+    <div class="principal">
+      <div id="cargando" class="cargando">Cargando SQLite…</div>
+      <div id="ejercicio" hidden>
+        <div class="chips" id="chips"></div>
+        <h2 id="titulo"></h2>
+        <p id="enunciado" class="enunciado"></p>
+        <details id="panelEsq" class="esquema" open>
+          <summary>Esquema y datos de <span id="nombreBase"></span></summary>
+          <div id="esquema" class="tablas"></div>
+        </details>
+        <div class="editor-wrap">
+          <label for="editor" class="visually-hidden">Tu SQL</label>
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Escribe tu SQL aquí…"></textarea>
+          <div class="acciones">
+            <button id="btnEjecutar" class="btn">Ejecutar <kbd>⌘↵</kbd></button>
+            <button id="btnRevisar" class="btn btn-prim">Revisar <kbd>⌘⇧↵</kbd></button>
+            <button id="btnPista" class="btn btn-sec">Pista</button>
+            <button id="btnSolucion" class="btn btn-sec">Ver solución</button>
+            <span class="esp"></span>
+            <button id="btnSig" class="btn btn-sec">Siguiente →</button>
+          </div>
+        </div>
+        <div id="pistas" class="caja" hidden></div>
+        <div id="feedback" class="caja feedback" hidden></div>
+        <div id="resultado" class="caja" hidden></div>
+        <div id="solucion" class="caja" hidden></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
+<script src="datos.js"></script>
+<script src="contenido.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

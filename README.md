@@ -4,6 +4,16 @@ Página para practicar SQL con ejercicios tipo certamen de Tecnologías de Infor
 
 **Úsala aquí:** https://tavooo-777.github.io/practica-sql-ti/
 
+## Segunda página: SQL para el test (LAB3, LAB4, LAB5)
+
+**Úsala aquí:** https://tavooo-777.github.io/practica-sql-ti/test/
+
+- Resumen para entender comandos y estructuras: CREATE TABLE por dentro, restricciones, ON DELETE/ON UPDATE, ALTER/DROP/TRUNCATE, INSERT/UPDATE/DELETE, SELECT, agregaciones y GROUP BY, JOIN, subconsultas y vistas.
+- 3 tests de alternativas (21 preguntas) con la explicación de cada respuesta.
+- Práctica con los ejercicios de los laboratorios (7 de esports y 10 de minimarket) y un laboratorio libre sobre cada base.
+
+## Primera página: práctica tipo certamen
+
 ## Qué tiene
 
 - 27 ejercicios sobre 4 bases de datos: Universidad (M2.3), Accidentes (certamen 2020), Mascotas (certamen 2021) y Proyectos (certamen 2018).
