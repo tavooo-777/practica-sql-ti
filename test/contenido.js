@@ -265,3 +265,147 @@ const EJERCICIOS = [
       return 'Las filas 2 y 3 deben ser dos de los productos con 3 unidades.';
     } }
 ];
+
+// ───── Ejercicio integrador: Biblioteca (se construye desde cero) ─────
+const H = {
+  q(db, sql) { const r = db.exec(sql); return r.length ? r[0].values : []; },
+  cols(db, t) { return H.q(db, `PRAGMA table_info(${t})`); },
+  existe(db, t) { return H.q(db, `SELECT 1 FROM sqlite_master WHERE name='${t}' AND type='table'`).length > 0; },
+  falla(db, sql) { db.exec('SAVEPOINT chk'); let f = false; try { db.exec(sql); } catch (e) { f = true; } db.exec('ROLLBACK TO chk; RELEASE chk'); return f; },
+  conj(rows) { return rows.map((r) => JSON.stringify(r)).sort(); },
+  igualConj(a, b) { return JSON.stringify(H.conj(a)) === JSON.stringify(H.conj(b)); },
+  tabla(db, t, req, pk, notNull) {
+    if (!H.existe(db, t)) return `Falta crear la tabla ${t}.`;
+    const info = H.cols(db, t), nombres = info.map((c) => c[1]);
+    const falta = req.filter((c) => !nombres.includes(c));
+    if (falta.length) return `A la tabla ${t} le faltan columnas: ${falta.join(', ')}.`;
+    const pks = info.filter((c) => c[5] > 0).map((c) => c[1]);
+    if (JSON.stringify(pks.slice().sort()) !== JSON.stringify(pk.slice().sort())) return `La clave primaria de ${t} debe ser ${pk.join(', ')}.`;
+    const nn = notNull.filter((c) => { const f = info.find((x) => x[1] === c); return !(f && (f[3] === 1 || pks.includes(c))); });
+    if (nn.length) return `En ${t} deben ser NOT NULL: ${nn.join(', ')}.`;
+    return null;
+  }
+};
+const DATOS_INT = {
+  socio: [['11111111-1', 'Ana Soto', 'Ingeniería'], ['22222222-2', 'Luis Rojas', 'Medicina'], ['33333333-3', 'Marta Díaz', 'Ingeniería']],
+  libro: [['978-1', 'Bases de Datos', 2019, 3], ['978-2', 'Cálculo I', 2015, 2], ['978-3', 'Rayuela', 1963, 1], ['978-4', 'Algoritmos', 2021, 0]],
+  prestamo: [[1, '11111111-1', '978-1', '2026-10-01', '2026-10-08'], [2, '11111111-1', '978-2', '2026-10-05', null], [3, '22222222-2', '978-1', '2026-10-06', null], [4, '33333333-3', '978-3', '2026-10-07', '2026-10-12'], [5, '33333333-3', '978-1', '2026-10-10', null]]
+};
+const INTEGRADOR = {
+  id: 'INT', integrador: true, fuente: 'Ejercicio integrador', titulo: 'Biblioteca: de cero a consultas', pts: 0,
+  enunciado: 'Construyes la base de una biblioteca universitaria desde una base vacía: creas las tablas, cargas datos, los modificas, consultas, borras con claves foráneas y terminas con una vista. Cada parte se revisa contra la base que vas armando. Con "Ejecutar" pruebas sin guardar; con "Revisar" se guarda solo si la parte queda bien.',
+  partes: [
+    { cat: 'DDL', titulo: 'Crear socio',
+      html: 'Crea la tabla <code>socio</code> con: <code>rut</code> (texto de hasta 12, clave primaria), <code>nombre</code> (texto de hasta 50, obligatorio) y <code>carrera</code> (texto de hasta 40).',
+      pistas: ['CREATE TABLE socio ( ... );', 'La PK va junto a la columna: rut VARCHAR(12) PRIMARY KEY.', 'nombre lleva NOT NULL; carrera no.'],
+      solucion: 'CREATE TABLE socio (\n  rut VARCHAR(12) PRIMARY KEY,\n  nombre VARCHAR(50) NOT NULL,\n  carrera VARCHAR(40)\n);',
+      check: (db) => H.tabla(db, 'socio', ['rut', 'nombre', 'carrera'], ['rut'], ['nombre']) },
+    { cat: 'DDL', titulo: 'Crear libro con CHECK y DEFAULT',
+      html: 'Crea la tabla <code>libro</code>: <code>isbn</code> (texto de hasta 17, clave primaria), <code>titulo</code> (obligatorio), <code>anio</code> (entero; solo se aceptan años desde 1900) y <code>copias</code> (entero obligatorio, por defecto 1, nunca negativo).',
+      pistas: ['anio INTEGER CHECK (anio >= 1900).', 'copias INTEGER NOT NULL DEFAULT 1 CHECK (copias >= 0).'],
+      solucion: 'CREATE TABLE libro (\n  isbn VARCHAR(17) PRIMARY KEY,\n  titulo VARCHAR(100) NOT NULL,\n  anio INTEGER CHECK (anio >= 1900),\n  copias INTEGER NOT NULL DEFAULT 1 CHECK (copias >= 0)\n);',
+      check: (db) => {
+        const e = H.tabla(db, 'libro', ['isbn', 'titulo', 'anio', 'copias'], ['isbn'], ['titulo', 'copias']);
+        if (e) return e;
+        if (!H.falla(db, "INSERT INTO libro (isbn, titulo, anio, copias) VALUES ('x','x',1800,1)")) return 'Falta el CHECK: un libro del año 1800 debería rechazarse (anio >= 1900).';
+        if (!H.falla(db, "INSERT INTO libro (isbn, titulo, anio, copias) VALUES ('x','x',2000,-1)")) return 'Falta el CHECK: copias negativas deberían rechazarse.';
+        if (H.falla(db, "INSERT INTO libro (isbn, titulo, anio, copias) VALUES ('x','x',2000,1)")) return 'Tu CHECK rechaza datos válidos (año 2000 con 1 copia).';
+        let v = [];
+        db.exec('SAVEPOINT d');
+        try { db.exec("INSERT INTO libro (isbn, titulo, anio) VALUES ('d','d',2000)"); v = H.q(db, "SELECT copias FROM libro WHERE isbn='d'"); } catch (e) { /* sin DEFAULT: falla el NOT NULL */ }
+        db.exec('ROLLBACK TO d; RELEASE d');
+        if (!v.length || v[0][0] !== 1) return 'Falta DEFAULT 1 en copias: al insertar un libro sin copias debería quedar en 1.';
+        return null;
+      } },
+    { cat: 'DDL', titulo: 'Crear prestamo con claves foráneas',
+      html: 'Crea <code>prestamo</code>: <code>id_prestamo</code> (entero, clave primaria), <code>rut_socio</code> (FK a socio; si se borra el socio, se borran sus préstamos), <code>isbn</code> (FK a libro; no se puede borrar un libro con préstamos), <code>fecha_prestamo</code> (DATE obligatoria) y <code>fecha_devolucion</code> (DATE, puede ser NULL).',
+      pistas: ['Dos FOREIGN KEY ... REFERENCES ..., una por cada tabla padre.', 'Socio: ON DELETE CASCADE. Libro: ON DELETE RESTRICT.', 'Sin coma después de la última línea.'],
+      solucion: 'CREATE TABLE prestamo (\n  id_prestamo INTEGER PRIMARY KEY,\n  rut_socio VARCHAR(12) NOT NULL,\n  isbn VARCHAR(17) NOT NULL,\n  fecha_prestamo DATE NOT NULL,\n  fecha_devolucion DATE,\n  FOREIGN KEY (rut_socio) REFERENCES socio(rut)\n    ON DELETE CASCADE,\n  FOREIGN KEY (isbn) REFERENCES libro(isbn)\n    ON DELETE RESTRICT\n);',
+      check: (db) => {
+        const e = H.tabla(db, 'prestamo', ['id_prestamo', 'rut_socio', 'isbn', 'fecha_prestamo', 'fecha_devolucion'], ['id_prestamo'], ['fecha_prestamo']);
+        if (e) return e;
+        const fd = H.cols(db, 'prestamo').find((c) => c[1] === 'fecha_devolucion');
+        if (fd[3] === 1) return 'fecha_devolucion debe admitir NULL (un préstamo sin devolver).';
+        const fk = H.q(db, 'PRAGMA foreign_key_list(prestamo)');
+        const a = fk.find((r) => r[3] === 'rut_socio' && String(r[2]).toLowerCase() === 'socio');
+        if (!a) return 'rut_socio debe ser FOREIGN KEY hacia socio.';
+        if (a[6] !== 'CASCADE') return 'La FK de rut_socio debe ser ON DELETE CASCADE.';
+        const b = fk.find((r) => r[3] === 'isbn' && String(r[2]).toLowerCase() === 'libro');
+        if (!b) return 'isbn debe ser FOREIGN KEY hacia libro.';
+        if (!['RESTRICT', 'NO ACTION'].includes(b[6])) return 'La FK de isbn debe ser ON DELETE RESTRICT.';
+        return null;
+      } },
+    { cat: 'DML', titulo: 'Insertar los datos',
+      html: 'Inserta estos datos. <b>Los padres primero</b>. A Rayuela no le des el valor de copias: debe quedar con el DEFAULT.' +
+        '<table><tr><th>socio</th><th>rut</th><th>nombre</th><th>carrera</th></tr><tr><td></td><td>11111111-1</td><td>Ana Soto</td><td>Ingeniería</td></tr><tr><td></td><td>22222222-2</td><td>Luis Rojas</td><td>Medicina</td></tr><tr><td></td><td>33333333-3</td><td>Marta Díaz</td><td>Ingeniería</td></tr></table>' +
+        '<table><tr><th>libro</th><th>isbn</th><th>titulo</th><th>anio</th><th>copias</th></tr><tr><td></td><td>978-1</td><td>Bases de Datos</td><td>2019</td><td>3</td></tr><tr><td></td><td>978-2</td><td>Cálculo I</td><td>2015</td><td>2</td></tr><tr><td></td><td>978-3</td><td>Rayuela</td><td>1963</td><td><i>(por defecto)</i></td></tr><tr><td></td><td>978-4</td><td>Algoritmos</td><td>2021</td><td>0</td></tr></table>' +
+        '<table><tr><th>prestamo</th><th>id</th><th>rut_socio</th><th>isbn</th><th>fecha_prestamo</th><th>fecha_devolucion</th></tr><tr><td></td><td>1</td><td>11111111-1</td><td>978-1</td><td>2026-10-01</td><td>2026-10-08</td></tr><tr><td></td><td>2</td><td>11111111-1</td><td>978-2</td><td>2026-10-05</td><td>NULL</td></tr><tr><td></td><td>3</td><td>22222222-2</td><td>978-1</td><td>2026-10-06</td><td>NULL</td></tr><tr><td></td><td>4</td><td>33333333-3</td><td>978-3</td><td>2026-10-07</td><td>2026-10-12</td></tr><tr><td></td><td>5</td><td>33333333-3</td><td>978-1</td><td>2026-10-10</td><td>NULL</td></tr></table>',
+      pistas: ['Orden: socio y libro primero, prestamo al final (tiene FK a los dos).', 'Puedes poner varias filas en un solo INSERT separándolas con coma.', "Para Rayuela usa INSERT INTO libro (isbn, titulo, anio) VALUES (...); sin la columna copias."],
+      solucion: "INSERT INTO socio (rut, nombre, carrera) VALUES\n  ('11111111-1', 'Ana Soto', 'Ingeniería'),\n  ('22222222-2', 'Luis Rojas', 'Medicina'),\n  ('33333333-3', 'Marta Díaz', 'Ingeniería');\n\nINSERT INTO libro (isbn, titulo, anio, copias) VALUES\n  ('978-1', 'Bases de Datos', 2019, 3),\n  ('978-2', 'Cálculo I', 2015, 2),\n  ('978-4', 'Algoritmos', 2021, 0);\nINSERT INTO libro (isbn, titulo, anio)\n  VALUES ('978-3', 'Rayuela', 1963);\n\nINSERT INTO prestamo VALUES\n  (1, '11111111-1', '978-1', '2026-10-01', '2026-10-08'),\n  (2, '11111111-1', '978-2', '2026-10-05', NULL),\n  (3, '22222222-2', '978-1', '2026-10-06', NULL),\n  (4, '33333333-3', '978-3', '2026-10-07', '2026-10-12'),\n  (5, '33333333-3', '978-1', '2026-10-10', NULL);",
+      check: (db) => {
+        const s = H.q(db, 'SELECT rut, nombre, carrera FROM socio'), l = H.q(db, 'SELECT isbn, titulo, anio, copias FROM libro'), p = H.q(db, 'SELECT id_prestamo, rut_socio, isbn, fecha_prestamo, fecha_devolucion FROM prestamo');
+        if (!H.igualConj(s, DATOS_INT.socio)) return `La tabla socio debe tener exactamente las 3 filas indicadas (tiene ${s.length}).`;
+        if (!H.igualConj(l, DATOS_INT.libro)) return `La tabla libro no coincide con lo pedido (tiene ${l.length} filas). Revisa los datos, y que Rayuela quede con copias = 1 por el DEFAULT.`;
+        if (!H.igualConj(p, DATOS_INT.prestamo)) return `La tabla prestamo debe tener exactamente las 5 filas indicadas (tiene ${p.length}).`;
+        return null;
+      } },
+    { cat: 'DML', titulo: 'Actualizar una devolución',
+      html: 'Ana devolvió "Cálculo I" el <b>2026-10-12</b>. Actualiza la <code>fecha_devolucion</code> del préstamo 2 y no toques ningún otro.',
+      pistas: ['UPDATE tabla SET columna = valor WHERE condición;', 'Filtra por la clave: WHERE id_prestamo = 2. Sin WHERE cambiarías todos.'],
+      solucion: "UPDATE prestamo\nSET fecha_devolucion = '2026-10-12'\nWHERE id_prestamo = 2;",
+      check: (db) => {
+        const esp = DATOS_INT.prestamo.map((r) => (r[0] === 2 ? [2, r[1], r[2], r[3], '2026-10-12'] : r));
+        const p = H.q(db, 'SELECT id_prestamo, rut_socio, isbn, fecha_prestamo, fecha_devolucion FROM prestamo');
+        return H.igualConj(p, esp) ? null : 'Solo el préstamo 2 debe cambiar a 2026-10-12. Revisa el WHERE.';
+      } },
+    { cat: 'DDL', titulo: 'Agregar una columna',
+      html: 'Agrega a <code>socio</code> la columna <code>email</code> (texto de hasta 50). Los socios actuales quedarán con NULL en ella.',
+      pistas: ['ALTER TABLE tabla ADD COLUMN nombre tipo;'],
+      solucion: 'ALTER TABLE socio\nADD COLUMN email VARCHAR(50);',
+      check: (db) => (H.cols(db, 'socio').some((c) => c[1] === 'email') ? null : 'La tabla socio todavía no tiene la columna email.') },
+    { cat: 'Consulta', titulo: 'Préstamos sin devolver (JOIN)', ordCol: null, req: ['socio', 'prestamo', 'libro'],
+      html: 'Muestra el <code>nombre</code> del socio y el <code>titulo</code> del libro de los préstamos que <b>aún no se devuelven</b> (<code>fecha_devolucion</code> es NULL).',
+      pistas: ['Camino: socio → prestamo → libro (2 JOIN).', 'Para NULL se usa IS NULL, no = NULL.'],
+      solucion: 'SELECT s.nombre, l.titulo\nFROM socio AS s\nJOIN prestamo AS p ON s.rut = p.rut_socio\nJOIN libro AS l ON p.isbn = l.isbn\nWHERE p.fecha_devolucion IS NULL;',
+      esperado: [['Luis Rojas', 'Bases de Datos'], ['Marta Díaz', 'Bases de Datos']] },
+    { cat: 'Consulta', titulo: 'Préstamos por socio (GROUP BY)', ordCol: 1, req: ['socio', 'prestamo'],
+      html: 'Muestra el <code>nombre</code> de cada socio y la cantidad de préstamos que ha hecho, de mayor a menor cantidad.',
+      pistas: ['"Cada socio" → GROUP BY.', 'COUNT(*) y ORDER BY ese conteo DESC.'],
+      solucion: 'SELECT s.nombre, COUNT(*) AS prestamos\nFROM socio AS s\nJOIN prestamo AS p ON s.rut = p.rut_socio\nGROUP BY s.rut, s.nombre\nORDER BY prestamos DESC;',
+      esperado: [['Ana Soto', 2], ['Marta Díaz', 2], ['Luis Rojas', 1]] },
+    { cat: 'Consulta', titulo: 'El libro más prestado (LIMIT)', ordCol: null, req: ['libro', 'prestamo'],
+      html: 'Muestra el <code>titulo</code> del libro más prestado y cuántas veces se prestó (una sola fila).',
+      pistas: ['libro JOIN prestamo; cuenta por libro.', 'ORDER BY el conteo DESC LIMIT 1.'],
+      solucion: 'SELECT l.titulo, COUNT(*) AS total\nFROM libro AS l\nJOIN prestamo AS p ON l.isbn = p.isbn\nGROUP BY l.isbn, l.titulo\nORDER BY total DESC\nLIMIT 1;',
+      esperado: [['Bases de Datos', 3]] },
+    { cat: 'DML', titulo: 'Borrar con CASCADE',
+      html: 'Marta (RUT 33333333-3) se retira. Bórrala de <code>socio</code>: sus préstamos deben desaparecer solos por el CASCADE.',
+      pistas: ['DELETE FROM socio WHERE rut = ...;', 'No borres los préstamos a mano: la FK lo hace.'],
+      solucion: "DELETE FROM socio\nWHERE rut = '33333333-3';",
+      check: (db) => {
+        const s = H.q(db, 'SELECT rut FROM socio').map((r) => r[0]).sort();
+        if (JSON.stringify(s) !== JSON.stringify(['11111111-1', '22222222-2'])) return 'Deben quedar solo Ana y Luis en socio.';
+        const p = H.q(db, 'SELECT id_prestamo FROM prestamo').map((r) => r[0]).sort();
+        return JSON.stringify(p) === JSON.stringify([1, 2, 3]) ? null : 'Los préstamos de Marta (4 y 5) deberían haberse borrado en cascada; quedan: ' + p.join(', ') + '.';
+      } },
+    { cat: 'DML', titulo: 'Borrar con RESTRICT',
+      html: 'Primero <b>intenta borrar el libro 978-1</b> con "Ejecutar" y lee el error (hay préstamos que lo usan: RESTRICT). Después borra el libro 978-4, que nadie ha pedido, y "Revisa".',
+      pistas: ['Un DELETE FROM libro WHERE isbn = ... por cada libro.', 'El de 978-1 debe fallar; en "Revisar" envía solo el de 978-4.'],
+      solucion: "-- DELETE FROM libro WHERE isbn = '978-1';  -- falla por RESTRICT\nDELETE FROM libro\nWHERE isbn = '978-4';",
+      check: (db) => {
+        const l = H.q(db, 'SELECT isbn FROM libro').map((r) => r[0]).sort();
+        return JSON.stringify(l) === JSON.stringify(['978-1', '978-2', '978-3']) ? null : 'Debe borrarse solo el libro 978-4. Quedan: ' + l.join(', ') + '.';
+      } },
+    { cat: 'Vista', titulo: 'Crear una vista', req: ['socio', 'prestamo', 'libro'],
+      html: 'Crea la vista <code>prestamos_activos</code> con el <code>nombre</code> del socio y el <code>titulo</code> del libro de los préstamos sin devolver (la consulta de la parte 7).',
+      pistas: ['CREATE OR REPLACE VIEW nombre AS SELECT ...;', 'Es la misma consulta de la parte 7.'],
+      solucion: 'CREATE OR REPLACE VIEW prestamos_activos AS\nSELECT s.nombre, l.titulo\nFROM socio AS s\nJOIN prestamo AS p ON s.rut = p.rut_socio\nJOIN libro AS l ON p.isbn = l.isbn\nWHERE p.fecha_devolucion IS NULL;',
+      check: (db) => {
+        if (!H.q(db, "SELECT 1 FROM sqlite_master WHERE type='view' AND name='prestamos_activos'").length) return 'No existe la vista prestamos_activos.';
+        let r; try { r = db.exec('SELECT * FROM prestamos_activos'); } catch (e) { return 'La vista da error al consultarla: ' + e.message; }
+        const v = r.length ? r[0].values : [];
+        if (r.length && r[0].columns.length !== 2) return 'La vista debe tener 2 columnas: nombre y titulo.';
+        return H.igualConj(v, [['Luis Rojas', 'Bases de Datos']]) ? null : 'La vista debería mostrar solo el préstamo sin devolver que queda (Luis, Bases de Datos).';
+      } }
+  ]
+};

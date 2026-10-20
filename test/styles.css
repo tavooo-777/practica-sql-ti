@@ -246,6 +246,18 @@ pre.codigo {
 .resumen .fila .estado.ok { color: var(--verde); }
 .resumen .fila .estado.mal { color: var(--rojo); }
 
+/* Integrador */
+.partes { margin-bottom: 14px; }
+.partes-fila { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.parte { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--linea); background: var(--papel); color: var(--tinta); font-weight: 700; cursor: pointer; }
+.parte.hecha { background: var(--verde-claro); border-color: var(--verde); color: var(--verde); }
+.parte.activa { box-shadow: 0 0 0 3px var(--azul-claro); border-color: var(--azul); }
+.partes-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+.enunciado table { border-collapse: collapse; margin: 8px 0; font-size: 13.5px; }
+.enunciado th, .enunciado td { border: 1px solid var(--borde); padding: 3px 8px; }
+.enunciado th { background: var(--azul-tenue); }
+.nota-prueba { color: var(--suave); font-size: 13px; margin-top: 8px; }
+
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
   .lista { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--borde); }

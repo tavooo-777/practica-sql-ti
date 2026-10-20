@@ -10,7 +10,9 @@ Página para practicar SQL con ejercicios tipo certamen de Tecnologías de Infor
 
 - Resumen para entender comandos y estructuras: CREATE TABLE por dentro, restricciones, ON DELETE/ON UPDATE, ALTER/DROP/TRUNCATE, INSERT/UPDATE/DELETE, SELECT, agregaciones y GROUP BY, JOIN, subconsultas y vistas.
 - 3 tests de alternativas (21 preguntas) con la explicación de cada respuesta.
+- **Ejercicio integrador de 12 partes (Biblioteca):** creas las tablas desde cero con claves, CHECK, DEFAULT y FK; insertas datos; actualizas; agregas una columna; consultas con JOIN, GROUP BY y LIMIT; borras con CASCADE y RESTRICT; y terminas con una vista. "Probar" ensaya sin guardar y "Revisar" guarda la parte solo si queda bien.
 - Práctica con los ejercicios de los laboratorios (7 de esports y 10 de minimarket) y un laboratorio libre sobre cada base.
+- Acepta la forma PostgreSQL de los labs: traduce `SERIAL`, `TRUNCATE`, `CREATE OR REPLACE VIEW` y `REFERENCES esquema.tabla` a SQLite.
 
 ## Primera página: práctica tipo certamen
 

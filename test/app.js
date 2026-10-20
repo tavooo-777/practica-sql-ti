@@ -97,8 +97,19 @@ function crearBD(base) {
   db.exec(SCRIPTS[base]);
   return db;
 }
+// Acepta la forma PostgreSQL de los labs y la traduce a SQLite.
+function aSQLite(sql) {
+  return sql
+    .replace(/\bCREATE\s+SCHEMA\b[^;]*;?/gi, '')
+    .replace(/\bCREATE\s+OR\s+REPLACE\s+VIEW\s+([\w.]+)\s+AS\b/gi, 'DROP VIEW IF EXISTS $1; CREATE VIEW $1 AS')
+    .replace(/\bTRUNCATE\s+(?:TABLE\s+)?([\w.]+)/gi, 'DELETE FROM $1')
+    .replace(/\bSERIAL\s+PRIMARY\s+KEY\b/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+    .replace(/\bSERIAL\b/gi, 'INTEGER')
+    .replace(/(REFERENCES\s+)\w+\.(\w+)/gi, '$1$2')
+    .replace(/\bbiblioteca\./gi, '');
+}
 function ejecutar(db, sql) {
-  const res = db.exec(sql);
+  const res = db.exec(aSQLite(sql));
   if (!res.length) return { columnas: [], filas: [], cambios: db.getRowsModified() };
   const r = res[res.length - 1];
   return { columnas: r.columns, filas: r.values, cambios: 0 };
@@ -106,6 +117,7 @@ function ejecutar(db, sql) {
 
 // ───────── Lista de ejercicios ─────────
 const EJERCICIOS_UI = [
+  INTEGRADOR,
   { id: 'L-esports', libre: true, base: 'esports', fuente: 'Laboratorio libre', titulo: 'Base esports', pts: 0, enunciado: 'Prueba lo que quieras sobre la base esports: SELECT, INSERT, UPDATE, DELETE. Los cambios se mantienen hasta que reinicies.' },
   { id: 'L-minimarket', libre: true, base: 'minimarket', fuente: 'Laboratorio libre', titulo: 'Base minimarket', pts: 0, enunciado: 'Prueba lo que quieras sobre la base minimarket. Los cambios se mantienen hasta que reinicies.' },
   ...EJERCICIOS
@@ -131,9 +143,11 @@ function tablaHTML(columnas, filas, claseNulo = true) {
 }
 
 function pintarEsquema(db, base) {
-  const tablas = db.exec(`SELECT name FROM ${base}.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)[0].values.map((r) => r[0]);
-  $('nombreBase').textContent = base;
-  $('esquema').innerHTML = tablas.map((t) => {
+  const r0 = db.exec(`SELECT name, type FROM ${base}.sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY type DESC, name`);
+  const objs = r0.length ? r0[0].values : [];
+  $('nombreBase').textContent = base === 'main' ? 'tu base (se actualiza al revisar)' : base;
+  if (!objs.length) { $('esquema').innerHTML = '<p class="meta">Aún no hay tablas. Las que crees aparecerán aquí.</p>'; return; }
+  $('esquema').innerHTML = objs.map(([t, tipo]) => {
     const cols = db.exec(`PRAGMA ${base}.table_info(${t})`)[0].values;
     const fks = db.exec(`PRAGMA ${base}.foreign_key_list(${t})`);
     const fkCols = fks.length ? Object.fromEntries(fks[0].values.map((r) => [r[3], r[2] + '.' + r[4]])) : {};
@@ -143,15 +157,18 @@ function pintarEsquema(db, base) {
       if (fkCols[c[1]]) return `<span class="fk" title="FK → ${esc(fkCols[c[1]])}">${nombre}</span>`;
       return nombre;
     }).join(', ');
-    const data = db.exec(`SELECT * FROM ${base}.${t}`)[0];
+    const d = db.exec(`SELECT * FROM ${base}.${t}`)[0] || { columns: cols.map((c) => c[1]), values: [] };
     const fkTxt = Object.entries(fkCols).map(([c, r]) => `${c} → ${r}`).join(' · ');
-    return `<div class="tabla-card"><h4>${base}.${esc(t)}</h4><div class="firma">${firma}${fkTxt ? `<br><small>FK: ${esc(fkTxt)}</small>` : ''}</div><div class="datos">${tablaHTML(data.columns, data.values)}</div></div>`;
+    const titulo = (base === 'main' ? '' : base + '.') + esc(t) + (tipo === 'view' ? ' (vista)' : '');
+    return `<div class="tabla-card"><h4>${titulo}</h4><div class="firma">${firma}${fkTxt ? `<br><small>FK: ${esc(fkTxt)}</small>` : ''}</div><div class="datos">${tablaHTML(d.columns, d.values)}</div></div>`;
   }).join('');
 }
 
 function abrirEjercicio(id) {
   actual = EJERCICIOS_UI.find((e) => e.id === id);
   const e = actual;
+  $('partes').hidden = !e.integrador;
+  if (e.integrador) { pintarLista(); abrirInt(); return; }
   $('chips').innerHTML = `<span class="chip">${esc(e.fuente)}</span>` + (e.pts ? `<span class="chip">${e.pts} pt${e.pts > 1 ? 's' : ''}</span>` : '');
   $('titulo').textContent = e.titulo;
   $('enunciado').innerHTML = esc(e.enunciado) + (e.nota ? `<br><small>${esc(e.nota)}</small>` : '');
@@ -196,7 +213,7 @@ function erratas(sql) {
 function avisos(sql) {
   const s = limpiar(sql);
   const a = [];
-  if (/\b(UPDATE|DELETE)\b/i.test(s) && !/\bWHERE\b/i.test(s)) a.push(['error', 'UPDATE o DELETE sin WHERE afecta todas las filas.']);
+  if (/\bDELETE\s+FROM\b|\bUPDATE\s+[\w.]+\s+SET\b/i.test(s) && !/\bWHERE\b/i.test(s)) a.push(['error', 'UPDATE o DELETE sin WHERE afecta todas las filas.']);
   if (/\b\d{1,3}\.\d{3}\b/.test(s)) a.push(['error', 'Los números van sin punto de miles: 500000, no 500.000.']);
   if (/"[^"]*"/.test(s)) a.push(['error', "El texto va entre comillas simples ('Valorant'), no dobles."]);
   if (/\bFROM\s+[\w.]+(\s+(AS\s+)?\w+)?\s*,\s*[\w.]+/i.test(s)) a.push(['info', 'Estás uniendo tablas con coma. El curso espera JOIN ... ON.']);
@@ -221,6 +238,7 @@ function traducir(msg, sql) {
 function mostrarResultado(r, sql) {
   const cajaR = $('resultado');
   cajaR.hidden = false;
+  if (!r.columnas.length && /^\s*(--[^\n]*\n\s*)*SELECT\b/i.test(sql)) { cajaR.innerHTML = '<h3>Resultado</h3><div class="meta">0 filas</div><p>La consulta no devolvió filas. Revisa los filtros (y recuerda: para NULL se usa IS NULL, no = NULL).</p>'; return; }
   if (!r.columnas.length) { cajaR.innerHTML = `<h3>Listo</h3><p>La instrucción se ejecutó. Filas afectadas: ${r.cambios}.</p>`; return; }
   cajaR.innerHTML = `<h3>Resultado</h3><div class="meta">${r.filas.length} fila${r.filas.length === 1 ? '' : 's'}</div><div class="scroll">${tablaHTML(r.columnas, r.filas)}</div>`;
 }
@@ -232,6 +250,7 @@ function correr(sqlUsuario) {
   finally { if (!e.libre) db.close(); }
 }
 function ejecutarUI() {
+  if (actual.integrador) return ejecutarInt();
   const sql = $('editor').value.trim();
   if (!sql) return;
   const x = correr(sql);
@@ -252,6 +271,7 @@ const num = (v) => (typeof v === 'number' ? Math.round(v * 1e4) / 1e4 : v);
 const filaJ = (f) => JSON.stringify(f.map(num));
 const mismaFila = (a, b) => filaJ(a) === filaJ(b);
 function comparar(est, esp, ej) {
+  if (!est.columnas.length && esp.columnas.length) return 'Tu consulta no devolvió ninguna fila. Revisa los filtros (y recuerda: para NULL se usa IS NULL).';
   if (est.columnas.length !== esp.columnas.length) return `Tu consulta devuelve ${est.columnas.length} columna(s) y se piden ${esp.columnas.length}.`;
   if (ej.validar) return ej.validar(est.filas, esp.filas, { filas: mismaFila });
   if (est.filas.length !== esp.filas.length) return `Devuelve ${est.filas.length} fila(s) y se esperaban ${esp.filas.length}.${est.filas.length > esp.filas.length ? ' ¿Faltó DISTINCT o un filtro?' : ' ¿Faltó un JOIN o te pasaste con el filtro?'}`;
@@ -261,6 +281,7 @@ function comparar(est, esp, ej) {
   return null;
 }
 function revisar() {
+  if (actual.integrador) return revisarInt();
   const e = actual, sql = $('editor').value.trim();
   if (!sql) return;
   const x = correr(sql);
@@ -300,7 +321,7 @@ function revisar() {
 
 let pistaN = 0;
 function pista() {
-  const ps = actual.pistas || [];
+  const ps = (actual.integrador ? actual.partes[intParte] : actual).pistas || [];
   if (!ps.length) return;
   pistaN = Math.min(pistaN + 1, ps.length);
   const c = $('pistas');
@@ -310,9 +331,10 @@ function pista() {
 function solucion() {
   const c = $('solucion');
   c.hidden = false;
-  c.innerHTML = `<h3>Solución</h3><pre class="codigo">${esc(actual.solucion)}</pre>`;
+  c.innerHTML = `<h3>Solución</h3><pre class="codigo">${esc((actual.integrador ? actual.partes[intParte] : actual).solucion)}</pre>`;
 }
 function siguiente() {
+  if (actual.integrador) { if (intParte < INTEGRADOR.partes.length - 1) { intParte++; abrirInt(); } return; }
   if (actual.libre) {
     dbLibre[actual.base] = crearBD(actual.base);
     pintarEsquema(dbLibre[actual.base], actual.base);
@@ -332,6 +354,106 @@ $('editor').addEventListener('keydown', (ev) => {
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); (ev.shiftKey && !actual.libre ? revisar : ejecutarUI)(); }
   if (ev.key === 'Tab') { ev.preventDefault(); const t = ev.target, p = t.selectionStart; t.value = t.value.slice(0, p) + '  ' + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = p + 2; }
 });
+
+// ───────── Ejercicio integrador ─────────
+let intDB = null, intParte = 0, intOk = [];
+function dbNueva() { const d = new SQL.Database(); d.exec('PRAGMA foreign_keys = ON'); return d; }
+function dbCopia(d) {
+  const datos = d.export();
+  d.exec('PRAGMA foreign_keys = ON'); // export() reinicia los pragmas
+  const c = new SQL.Database(datos);
+  c.exec('PRAGMA foreign_keys = ON');
+  return c;
+}
+function abrirInt() {
+  if (!intDB) { intDB = dbNueva(); intOk = []; intParte = 0; }
+  const P = INTEGRADOR.partes, p = P[intParte];
+  $('partes').innerHTML = `<div class="partes-fila">${P.map((x, i) => `<button class="parte ${i === intParte ? 'activa' : ''} ${intOk[i] ? 'hecha' : ''}" data-i="${i}" title="${esc(x.titulo)}">${i + 1}</button>`).join('')}</div>
+    <div class="partes-acc"><button class="btn btn-sec" id="btnPrep">Preparar partes anteriores con la solución</button><button class="btn btn-sec" id="btnReset">Reiniciar todo</button></div>`;
+  document.querySelectorAll('.parte').forEach((b) => b.addEventListener('click', () => { intParte = +b.dataset.i; abrirInt(); }));
+  $('btnPrep').addEventListener('click', () => { prepararInt(intParte); abrirInt(); });
+  $('btnReset').addEventListener('click', () => { intDB.close(); intDB = null; abrirInt(); });
+  $('chips').innerHTML = `<span class="chip">Parte ${intParte + 1} de ${P.length}</span><span class="chip">${esc(p.cat)}</span>`;
+  $('titulo').textContent = p.titulo;
+  $('enunciado').innerHTML = p.html + (intParte === 0 ? `<br><small>${esc(INTEGRADOR.enunciado)}</small>` : '');
+  $('editor').value = '';
+  ['pistas', 'feedback', 'resultado', 'solucion'].forEach((x) => { $(x).hidden = true; });
+  $('btnRevisar').hidden = $('btnPista').hidden = $('btnSolucion').hidden = false;
+  $('btnEjecutar').textContent = 'Probar';
+  $('btnSig').textContent = 'Siguiente parte →';
+  pistaN = 0;
+  pintarEsquema(intDB, 'main');
+  pintarLista();
+  $('editor').focus();
+}
+function prepararInt(n) {
+  intDB.close(); intDB = dbNueva(); intOk = [];
+  for (let i = 0; i < n; i++) { ejecutar(intDB, INTEGRADOR.partes[i].solucion); intOk[i] = true; }
+}
+function correrInt(sql) {
+  const copia = dbCopia(intDB);
+  try { return { ok: true, r: ejecutar(copia, sql), copia }; } catch (err) { copia.close(); return { ok: false, error: err.message }; }
+}
+function ejecutarInt() {
+  const sql = $('editor').value.trim();
+  if (!sql) return;
+  const x = correrInt(sql);
+  const f = $('feedback');
+  if (!x.ok) {
+    $('resultado').hidden = true; f.hidden = false; f.className = 'caja feedback mal';
+    f.innerHTML = `<h3>Error</h3><p>${esc(traducir(x.error, sql))}</p>`;
+    return;
+  }
+  x.copia.close();
+  mostrarResultado(x.r, sql);
+  f.hidden = false; f.className = 'caja feedback info';
+  f.innerHTML = '<h3>Prueba ejecutada</h3><p>Esto fue un ensayo: no se guardó nada. Cuando esté bien, pulsa Revisar.</p>' + avisos(sql).map((a) => `<div class="aviso ${a[0] === 'error' ? 'error' : ''}">${esc(a[1])}</div>`).join('');
+}
+function revisarInt() {
+  const sql = $('editor').value.trim();
+  if (!sql) return;
+  const p = INTEGRADOR.partes[intParte];
+  const x = correrInt(sql);
+  const f = $('feedback');
+  f.hidden = false;
+  if (!x.ok) {
+    $('resultado').hidden = true; f.className = 'caja feedback mal';
+    f.innerHTML = `<h3>Error</h3><p>${esc(traducir(x.error, sql))}</p>`;
+    return;
+  }
+  let problema = null;
+  if (p.esperado) {
+    mostrarResultado(x.r, sql);
+    const n = p.esperado[0].length;
+    if (!x.r.columnas.length) problema = /^\s*(--[^\n]*\n\s*)*SELECT\b/i.test(sql) ? 'Tu consulta no devolvió ninguna fila. Revisa los filtros (y recuerda: para NULL se usa IS NULL, no = NULL).' : 'Esta parte pide una consulta SELECT.';
+    else if (x.r.columnas.length !== n) problema = `Debes devolver ${n} columna(s) y devuelves ${x.r.columnas.length}.`;
+    else if (x.r.filas.length !== p.esperado.length) problema = `Devuelve ${x.r.filas.length} fila(s) y se esperaban ${p.esperado.length}.`;
+    else if (!H.igualConj(x.r.filas, p.esperado)) problema = 'Las filas no coinciden con lo esperado. Revisa columnas, filtros y uniones.';
+    else if (p.ordCol != null && x.r.filas.some((fi, i) => num(fi[p.ordCol]) !== num(p.esperado[i][p.ordCol]))) problema = 'Las filas son las correctas, pero el orden no es el pedido.';
+  } else {
+    problema = p.check(x.copia);
+  }
+  if (!problema && p.req) {
+    const faltan = p.req.filter((t) => !new RegExp('\\b' + t + '\\b', 'i').test(sql));
+    if (faltan.length) problema = 'Falta usar la tabla ' + faltan.join(', ') + ' en tu consulta.';
+  }
+  const av = avisos(sql);
+  const avHTML = av.length ? `<div class="avisos">${av.map((a) => `<div class="aviso ${a[0] === 'error' ? 'error' : ''}">${esc(a[1])}</div>`).join('')}</div>` : '';
+  if (problema) {
+    x.copia.close();
+    f.className = 'caja feedback mal';
+    f.innerHTML = `<h3>Todavía no</h3><p>${esc(problema)}</p><p class="nota-prueba">No se guardó nada: corrige y vuelve a pulsar Revisar.</p>${avHTML}`;
+    return;
+  }
+  if (p.esperado) x.copia.close(); else { intDB.close(); intDB = x.copia; }
+  intOk[intParte] = true;
+  const ultima = intOk.filter(Boolean).length === INTEGRADOR.partes.length;
+  f.className = 'caja feedback ok';
+  f.innerHTML = `<h3>${ultima ? 'Terminaste el ejercicio completo' : 'Correcto'}</h3><p>${ultima ? 'Creaste, cargaste, modificaste, consultaste y borraste con claves foráneas, todo en una misma base.' : 'Parte guardada en tu base. Pasa a la siguiente.'}</p>${avHTML}`;
+  pintarEsquema(intDB, 'main');
+  document.querySelectorAll('.parte')[intParte].classList.add('hecha');
+  pintarLista();
+}
 
 // ───────── Arranque ─────────
 pintarMenuTests();
